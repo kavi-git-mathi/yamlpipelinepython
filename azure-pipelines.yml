@@ -8,6 +8,8 @@ variables:
   dockerhubUsername: 'kavitharc'
   imageName: 'yamlpythonapp'
   tag: '$(Build.BuildId)'
+  aksName: 'myAKSCluster'
+  namespace: 'default'
 
 stages:
 - stage: Build
@@ -22,7 +24,6 @@ stages:
         targetType: 'inline'
         script: |
           mkdir -p manifests
-          echo "Creating deployment.yaml..."
           echo "apiVersion: apps/v1" > manifests/deployment.yaml
           echo "kind: Deployment" >> manifests/deployment.yaml
           echo "metadata:" >> manifests/deployment.yaml
@@ -44,8 +45,6 @@ stages:
           echo "        image: kavitharc/yamlpythonapp:latest" >> manifests/deployment.yaml
           echo "        ports:" >> manifests/deployment.yaml
           echo "        - containerPort: 80" >> manifests/deployment.yaml
-          
-          echo "Creating service.yaml..."
           echo "apiVersion: v1" > manifests/service.yaml
           echo "kind: Service" >> manifests/service.yaml
           echo "metadata:" >> manifests/service.yaml
@@ -57,9 +56,6 @@ stages:
           echo "    targetPort: 80" >> manifests/service.yaml
           echo "  selector:" >> manifests/service.yaml
           echo "    app: myapp" >> manifests/service.yaml
-          
-          echo "Manifests created successfully!"
-          ls -la manifests/
 
     - task: Docker@2
       displayName: 'Login to Docker Hub'
@@ -116,17 +112,19 @@ stages:
       displayName: 'Set K8s Context'
       inputs:
         connectionType: 'Azure Resource Manager'
-        azureSubscription: '8253847f-5312-4919-9455-413d8ccca66c'
+        azureSubscriptionEndpoint: 'Azure subscription 1 (8253847f-5312-4919-9455-413d8ccca66c)'  
         azureResourceGroup: 'NCPLindia'
-        kubernetesCluster: 'myAKSCluster'
+        kubernetesCluster: '$(aksName)'
         command: 'set context'
+        namespace: '$(namespace)'
 
     - task: Kubernetes@1
       displayName: 'Deploy to AKS'
       inputs:
         connectionType: 'Azure Resource Manager'
-        azureSubscription: '8253847f-5312-4919-9455-413d8ccca66c'
+        azureSubscriptionEndpoint: 'Azure subscription 1 (8253847f-5312-4919-9455-413d8ccca66c)'  
         azureResourceGroup: 'NCPLindia'
-        kubernetesCluster: 'myAKSCluster'
+        kubernetesCluster: '$(aksName)'
         command: 'apply'
         arguments: '-f $(System.DefaultWorkingDirectory)/manifests'
+        namespace: '$(namespace)'
