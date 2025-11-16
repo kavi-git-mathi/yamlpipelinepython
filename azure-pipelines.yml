@@ -108,21 +108,21 @@ stages:
           sed -i 's|:latest|:$(Build.BuildId)|g' $(System.DefaultWorkingDirectory)/manifests/deployment.yaml
           echo "Updated image tag to: $(Build.BuildId)"
 
-    - task: Kubernetes@1
-      displayName: 'Set K8s Context'
+    - task: AzureCLI@2
+      displayName: 'Get AKS Credentials'
       inputs:
-        connectionType: 'Azure Resource Manager'
-        azureSubscriptionEndpoint: 'Azure subscription 1 (8253847f-5312-4919-9455-413d8ccca66c)'  
-        azureResourceGroup: 'NCPLindia'
-        kubernetesCluster: '$(aksName)'
-        command: 'set context'
-        namespace: '$(namespace)'
+        azureSubscription: 'Azure subscription 1 (8253847f-5312-4919-9455-413d8ccca66c)'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          az aks get-credentials --resource-group NCPLindia --name myAKSCluster --overwrite-existing
+          kubectl config get-contexts
 
     - task: Kubernetes@1
       displayName: 'Deploy to AKS'
       inputs:
         connectionType: 'Azure Resource Manager'
-        azureSubscriptionEndpoint: 'Azure subscription 1 (8253847f-5312-4919-9455-413d8ccca66c)'  
+        azureSubscriptionEndpoint: 'Azure subscription 1 (8253847f-5312-4919-9455-413d8ccca66c)'
         azureResourceGroup: 'NCPLindia'
         kubernetesCluster: '$(aksName)'
         command: 'apply'
