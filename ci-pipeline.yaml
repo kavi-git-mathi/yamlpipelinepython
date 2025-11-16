@@ -1,0 +1,133 @@
+# ci-pipeline.yml - For Microsoft-hosted agents
+trigger:
+- main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  dockerhubUsername: 'kavitharc'  # Replace with your actual username
+  imageName: 'yamlpythonapp'                    # Replace with your app name
+  tag: '$(Build.BuildId)'
+
+steps:
+
+# Step 1: Display workspace info
+- task: Bash@3
+  displayName: 'Show Workspace Structure'
+  inputs:
+    targetType: 'inline'
+    script: |
+      echo "Current workspace: $(System.DefaultWorkingDirectory)"
+      echo "Directory contents:"
+      pwd
+      ls -la
+
+# Step 2: Create Kubernetes manifests dynamically
+- task: Bash@3
+  displayName: 'Create Kubernetes Manifests'
+  inputs:
+    targetType: 'inline'
+    script: |
+      echo "Creating manifests directory..."
+      mkdir -p $(System.DefaultWorkingDirectory)/manifests
+      
+      # Create deployment.yaml with proper image reference
+      cat > $(System.DefaultWorkingDirectory)/manifests/deployment.yaml << EOF
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: myapp-deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: myapp
+  template:
+    metadata:
+      labels:
+        app: myapp
+    spec:
+      imagePullSecrets:
+      - name: dockerhub-secret
+      containers:
+      - name: myapp
+        image: $(dockerhubUsername)/$(imageName):latest
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "250m"
+          limits:
+            memory: "128Mi"
+            cpu: "500m"
+EOF
+
+      # Create service.yaml
+      cat > $(System.DefaultWorkingDirectory)/manifests/service.yaml << EOF
+apiVersion: v1
+kind: Service
+metadata:
+  name: myapp-service
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 80
+  selector:
+    app: myapp
+EOF
+
+      echo "Manifests created successfully:"
+      ls -la $(System.DefaultWorkingDirectory)/manifests/
+      echo "--- Deployment.yaml content ---"
+      cat $(System.DefaultWorkingDirectory)/manifests/deployment.yaml
+
+# Step 3: Login to Docker Hub
+- task: Docker@2
+  displayName: 'Login to Docker Hub'
+  inputs:
+    containerRegistry: 'docker-connection'
+    command: 'login'
+
+# Step 4: Build Docker image
+- task: Docker@2
+  displayName: 'Build Docker Image'
+  inputs:
+    command: 'build'
+    Dockerfile: '**/Dockerfile'
+    tags: |
+      $(dockerhubUsername)/$(imageName):$(tag)
+      $(dockerhubUsername)/$(imageName):latest
+    arguments: '--pull'
+
+# Step 5: Push Docker image to Docker Hub
+- task: Docker@2
+  displayName: 'Push to Docker Hub'
+  inputs:
+    command: 'push'
+    tags: |
+      $(dockerhubUsername)/$(imageName):$(tag)
+      $(dockerhubUsername)/$(imageName):latest
+
+# Step 6: Verify manifests before publishing
+- task: Bash@3
+  displayName: 'Verify Manifests Exist'
+  inputs:
+    targetType: 'inline'
+    script: |
+      echo "Checking manifests directory:"
+      ls -la $(System.DefaultWorkingDirectory)/manifests/
+      echo "File count:"
+      find $(System.DefaultWorkingDirectory)/manifests -name "*.yaml" | wc -l
+      echo "All files:"
+      find $(System.DefaultWorkingDirectory)/manifests -type f
+
+# Step 7: Publish K8s Manifests
+- task: PublishBuildArtifacts@1
+  displayName: 'Publish K8s Manifests'
+  inputs:
+    PathtoPublish: '$(System.DefaultWorkingDirectory)/manifests'
+    ArtifactName: 'manifests'
+    publishLocation: 'Container'

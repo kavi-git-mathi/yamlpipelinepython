@@ -1,0 +1,132 @@
+trigger:
+- main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  dockerhubUsername: 'kavitharc'
+  imageName: 'yamlpythonapp'
+  tag: '$(Build.BuildId)'
+
+stages:
+- stage: Build
+  displayName: 'Build Docker Image'
+  jobs:
+  - job: Build
+    displayName: 'Build'
+    steps:
+    - task: Bash@3
+      displayName: 'Create K8s Manifests'
+      inputs:
+        targetType: 'inline'
+        script: |
+          mkdir -p manifests
+          echo "Creating deployment.yaml..."
+          echo "apiVersion: apps/v1" > manifests/deployment.yaml
+          echo "kind: Deployment" >> manifests/deployment.yaml
+          echo "metadata:" >> manifests/deployment.yaml
+          echo "  name: myapp-deployment" >> manifests/deployment.yaml
+          echo "spec:" >> manifests/deployment.yaml
+          echo "  replicas: 2" >> manifests/deployment.yaml
+          echo "  selector:" >> manifests/deployment.yaml
+          echo "    matchLabels:" >> manifests/deployment.yaml
+          echo "      app: myapp" >> manifests/deployment.yaml
+          echo "  template:" >> manifests/deployment.yaml
+          echo "    metadata:" >> manifests/deployment.yaml
+          echo "      labels:" >> manifests/deployment.yaml
+          echo "        app: myapp" >> manifests/deployment.yaml
+          echo "    spec:" >> manifests/deployment.yaml
+          echo "      imagePullSecrets:" >> manifests/deployment.yaml
+          echo "      - name: dockerhub-secret" >> manifests/deployment.yaml
+          echo "      containers:" >> manifests/deployment.yaml
+          echo "      - name: myapp" >> manifests/deployment.yaml
+          echo "        image: kavitharc/yamlpythonapp:latest" >> manifests/deployment.yaml
+          echo "        ports:" >> manifests/deployment.yaml
+          echo "        - containerPort: 80" >> manifests/deployment.yaml
+          
+          echo "Creating service.yaml..."
+          echo "apiVersion: v1" > manifests/service.yaml
+          echo "kind: Service" >> manifests/service.yaml
+          echo "metadata:" >> manifests/service.yaml
+          echo "  name: myapp-service" >> manifests/service.yaml
+          echo "spec:" >> manifests/service.yaml
+          echo "  type: LoadBalancer" >> manifests/service.yaml
+          echo "  ports:" >> manifests/service.yaml
+          echo "  - port: 80" >> manifests/service.yaml
+          echo "    targetPort: 80" >> manifests/service.yaml
+          echo "  selector:" >> manifests/service.yaml
+          echo "    app: myapp" >> manifests/service.yaml
+          
+          echo "Manifests created successfully!"
+          ls -la manifests/
+
+    - task: Docker@2
+      displayName: 'Login to Docker Hub'
+      inputs:
+        containerRegistry: 'docker-connection'
+        command: 'login'
+
+    - task: Docker@2
+      displayName: 'Build Docker Image'
+      inputs:
+        command: 'build'
+        Dockerfile: '**/Dockerfile'
+        tags: |
+          $(dockerhubUsername)/$(imageName):$(tag)
+          $(dockerhubUsername)/$(imageName):latest
+
+    - task: Docker@2
+      displayName: 'Push to Docker Hub'
+      inputs:
+        command: 'push'
+        tags: |
+          $(dockerhubUsername)/$(imageName):$(tag)
+          $(dockerhubUsername)/$(imageName):latest
+
+    - task: PublishPipelineArtifact@1
+      displayName: 'Publish Manifests'
+      inputs:
+        targetPath: 'manifests'
+        artifact: 'manifests'
+
+- stage: Deploy
+  displayName: 'Deploy to AKS'
+  dependsOn: Build
+  condition: succeeded()
+  jobs:
+  - job: Deploy
+    displayName: 'Deploy'
+    steps:
+    - task: DownloadPipelineArtifact@2
+      displayName: 'Download Manifests'
+      inputs:
+        artifact: 'manifests'
+        path: '$(System.DefaultWorkingDirectory)/manifests'
+
+    - task: Bash@3
+      displayName: 'Update Image Tag'
+      inputs:
+        targetType: 'inline'
+        script: |
+          sed -i 's|:latest|:$(Build.BuildId)|g' $(System.DefaultWorkingDirectory)/manifests/deployment.yaml
+          echo "Updated image tag to: $(Build.BuildId)"
+
+    - task: Kubernetes@1
+      displayName: 'Set K8s Context'
+      inputs:
+        connectionType: 'Azure Resource Manager'
+        azureSubscription: '8253847f-5312-4919-9455-413d8ccca66c'
+        azureResourceGroup: 'NCPLindia'
+        kubernetesCluster: 'myAKSCluster'
+        command: 'set context'
+
+    - task: Kubernetes@1
+      displayName: 'Deploy to AKS'
+      inputs:
+        connectionType: 'Azure Resource Manager'
+        azureSubscription: '8253847f-5312-4919-9455-413d8ccca66c'
+        azureResourceGroup: 'NCPLindia'
+        kubernetesCluster: 'myAKSCluster'
+        command: 'apply'
+        arguments: '-f $(System.DefaultWorkingDirectory)/manifests'

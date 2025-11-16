@@ -1,0 +1,72 @@
+<html>
+  <head>
+    <title>Welcome to NCPL Consulting Canada</title>
+    <style>
+      body {
+        margin: 0;
+        height: 100vh;
+        background: linear-gradient(135deg, #1e3c72, #2a5298, #00c6ff);
+        color: white;
+        font-family: 'Poppins', sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        animation: backgroundShift 10s infinite alternate;
+      }
+
+      @keyframes backgroundShift {
+        0% { background: linear-gradient(135deg, #1e3c72, #2a5298, #00c6ff); }
+        100% { background: linear-gradient(135deg, #ff512f, #dd2476, #24c6dc); }
+      }
+
+      .container {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 20px;
+        padding: 40px;
+        max-width: 600px;
+        border: 3px solid rgba(255, 255, 255, 0.5);
+        box-shadow: 0 0 40px rgba(255, 255, 255, 0.3);
+      }
+
+      h1 {
+        font-size: 2em;
+        text-transform: uppercase;
+        color: #ffeb3b;
+        text-shadow: 0 0 10px #ffeb3b, 0 0 20px #ff5722;
+        animation: glow 2s infinite alternate;
+      }
+
+      @keyframes glow {
+        from { text-shadow: 0 0 10px #ffeb3b, 0 0 20px #ff5722; }
+        to { text-shadow: 0 0 20px #00e5ff, 0 0 40px #00bcd4; }
+      }
+
+      h3 {
+        color: #fff;
+        margin-top: 10px;
+        font-weight: 400;
+      }
+
+      .highlight {
+        color: #00e5ff;
+        font-weight: bold;
+      }
+
+      footer {
+        margin-top: 30px;
+        font-size: 0.9em;
+        color: #ffccbc;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Welcome to NCPL Consulting Canada</h1>
+      <h3>Empowering Innovation, Cloud & Technology Excellence</h3>
+      <h3>🚀 Deployed inside <span class="highlight">Azure Kubernetes Service (AKS)</span></h3>
+      <h3>🎯 Integrating Cloud | DevOps | AI | Data</h3>
+      <footer>© 2025 NCPL Consulting | All Rights Reserved</footer>
+    </div>
+  </body>
+</html>
